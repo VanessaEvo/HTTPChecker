@@ -4,13 +4,22 @@ from tqdm import tqdm
 
 def check_domain(domain):
     try:
+        # Attempt to get the response from both HTTP and HTTPS
         response = requests.get(f"https://{domain}", stream=True)
-        status_code = response.status_code
-        headers = response.headers
-        redirect_history = response.history
-        return status_code, headers, redirect_history
-    except requests.exceptions.RequestException as e:
-        return None, None, None
+        response.raise_for_status()  # Raise an error for bad responses
+    except requests.exceptions.HTTPError as http_err:
+        return f"HTTP error occurred: {http_err}", None, None
+    except requests.exceptions.ConnectionError as conn_err:
+        return f"Connection error occurred: {conn_err}", None, None
+    except requests.exceptions.Timeout:
+        return "Request timed out", None, None
+    except requests.exceptions.RequestException as req_err:
+        return f"Request exception: {req_err}", None, None
+
+    status_code = response.status_code
+    headers = response.headers
+    redirect_history = response.history
+    return status_code, headers, redirect_history
 
 ascii_banner = pyfiglet.figlet_format("HTTP Checker")
 print(ascii_banner)
@@ -29,7 +38,7 @@ results_path = input("Enter the path and name of file to save the results: ")
 
 # Open the file to save the results
 with open(results_path, 'w') as results_file:
-    for domain in domains:
+    for domain in tqdm(domains, desc="Checking domains"):
         status_code, headers, redirect_history = check_domain(domain)
         results_file.write(f"Domain: {domain}\n")
         results_file.write(f"Status Code: {status_code}\n")
